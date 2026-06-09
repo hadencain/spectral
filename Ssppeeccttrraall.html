@@ -1,0 +1,1436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SPECTRAL.EXE</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Courier Prime', monospace;
+            background: #0a0a0a;
+            color: #e8e8e8;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 32px 20px;
+            overflow-x: hidden;
+        }
+
+        .terminal {
+            background: #111;
+            border: 1px solid rgba(255,255,255,0.08);
+            padding: 28px;
+            max-width: 1200px;
+            width: 100%;
+            display: flex;
+            gap: 24px;
+        }
+
+        .main-content { flex: 1; min-width: 0; }
+
+        /* --- Debug panel --- */
+        .debug-panel {
+            width: 280px;
+            flex-shrink: 0;
+            background: #0d0d0d;
+            border: 1px solid rgba(255,255,255,0.06);
+            padding: 12px;
+            font-size: 0.72em;
+            height: fit-content;
+            max-height: 640px;
+            overflow: hidden;
+            position: sticky;
+            top: 32px;
+        }
+
+        .debug-header {
+            color: rgba(232,232,232,0.5);
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            padding-bottom: 6px;
+            margin-bottom: 10px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            letter-spacing: 1px;
+            font-size: 0.9em;
+        }
+
+        .debug-toggle {
+            background: none;
+            border: 1px solid rgba(255,255,255,0.15);
+            color: rgba(232,232,232,0.5);
+            padding: 1px 7px;
+            font-size: 0.9em;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.15s ease;
+        }
+
+        .debug-toggle:hover { background: rgba(255,255,255,0.06); color: #e8e8e8; }
+
+        .debug-log { font-family: 'Courier Prime', monospace; line-height: 1.3; color: rgba(232,232,232,0.6); white-space: pre-wrap; }
+
+        .debug-line { margin-bottom: 2px; opacity: 1; transition: opacity 0.5s ease; }
+        .debug-line.fading { opacity: 0.25; }
+        .debug-line.error { color: #f87171; }
+        .debug-line.warning { color: #fbbf24; }
+        .debug-line.info { color: rgba(232,232,232,0.45); }
+
+        .debug-stats { border-top: 1px solid rgba(255,255,255,0.06); margin-top: 10px; padding-top: 10px; font-size: 0.9em; color: rgba(232,232,232,0.45); }
+        .debug-stat { display: flex; justify-content: space-between; margin-bottom: 4px; }
+        .debug-stat span:last-child { color: rgba(232,232,232,0.7); }
+
+        .debug-panel.collapsed { width: 36px; padding: 5px; }
+        .debug-panel.collapsed .debug-log,
+        .debug-panel.collapsed .debug-stats { display: none; }
+        .debug-panel.collapsed .debug-header {
+            writing-mode: vertical-rl;
+            border-bottom: none;
+            border-right: 1px solid rgba(255,255,255,0.06);
+            padding-right: 5px;
+            padding-bottom: 0;
+            margin-right: 5px;
+            margin-bottom: 0;
+            height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .debug-panel.collapsed .debug-toggle { margin-top: 10px; }
+
+        /* --- Header --- */
+        .header { border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 16px; margin-bottom: 24px; }
+
+        .title {
+            font-size: 1.6em;
+            font-weight: bold;
+            text-align: center;
+            letter-spacing: 4px;
+            color: #e8e8e8;
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 2px;
+            height: 1em;
+            background: rgba(232,232,232,0.4);
+            animation: blink 1.2s infinite;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
+
+        @keyframes blink {
+            0%, 49% { opacity: 1; }
+            50%, 100% { opacity: 0; }
+        }
+
+        /* --- Upload zone --- */
+        .upload-zone {
+            border: 1px dashed rgba(255,255,255,0.12);
+            padding: 36px 30px;
+            text-align: center;
+            margin-bottom: 24px;
+            background: rgba(255,255,255,0.02);
+            cursor: pointer;
+            transition: background 0.2s ease, border-color 0.2s ease;
+        }
+
+        .upload-zone:hover { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.22); }
+        .upload-zone.dragover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.35); }
+        .upload-text { font-size: 1em; margin-bottom: 14px; color: rgba(232,232,232,0.5); letter-spacing: 1px; }
+        .file-input { display: none; }
+
+        /* --- Buttons --- */
+        .btn {
+            background: transparent;
+            color: rgba(232,232,232,0.8);
+            border: 1px solid rgba(255,255,255,0.15);
+            padding: 7px 16px;
+            font-family: 'Courier Prime', monospace;
+            font-size: 0.85em;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn:hover { background: rgba(255,255,255,0.08); color: #e8e8e8; border-color: rgba(255,255,255,0.3); }
+        .btn:disabled { opacity: 0.3; cursor: not-allowed; }
+        .btn.active { background: rgba(255,255,255,0.12); color: #e8e8e8; border-color: rgba(255,255,255,0.5); }
+
+        /* --- Video --- */
+        .video-container { display: none; margin-bottom: 20px; }
+        .video-wrapper { border: 1px solid rgba(255,255,255,0.06); background: #000; }
+        video { width: 100%; height: auto; display: block; }
+
+        /* --- Frequency visualizer --- */
+        .visualizer {
+            display: none;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255,255,255,0.06);
+            background: rgba(0,0,0,0.4);
+            padding: 14px 20px 10px;
+        }
+
+        .viz-label-row {
+            font-size: 0.65em;
+            letter-spacing: 2px;
+            color: rgba(232,232,232,0.3);
+            margin-bottom: 10px;
+        }
+
+        .viz-bars {
+            display: flex;
+            justify-content: space-around;
+            align-items: flex-end;
+            height: 80px;
+            gap: 12px;
+        }
+
+        .viz-col {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+        }
+
+        .viz-bar-track {
+            width: 100%;
+            height: 80px;
+            display: flex;
+            align-items: flex-end;
+            background: rgba(255,255,255,0.03);
+        }
+
+        .viz-bar {
+            width: 100%;
+            height: 0;
+            transition: height 0.04s linear;
+        }
+
+        .viz-bar.bass    { background: #ef4444; }
+        .viz-bar.lowmid  { background: #f59e0b; }
+        .viz-bar.highmid { background: #22d3ee; }
+        .viz-bar.treble  { background: rgba(232,232,232,0.85); }
+
+        .viz-tag {
+            font-size: 0.58em;
+            letter-spacing: 1.5px;
+            color: rgba(232,232,232,0.3);
+            text-align: center;
+        }
+
+        /* --- Controls --- */
+        .controls { display: none; margin-top: 20px; }
+
+        .control-group {
+            margin-bottom: 18px;
+            padding: 14px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .control-group:last-child { border-bottom: none; }
+
+        .control-label {
+            display: block;
+            margin-bottom: 12px;
+            font-size: 0.7em;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: rgba(232,232,232,0.35);
+        }
+
+        .control-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .slider-section {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            flex: 1;
+        }
+
+        .slider-container { flex: 1; min-width: 120px; }
+
+        .slider {
+            width: 100%;
+            height: 2px;
+            background: rgba(255,255,255,0.1);
+            outline: none;
+            border: none;
+            cursor: pointer;
+            appearance: none;
+        }
+
+        .slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            background: #e8e8e8;
+            cursor: pointer;
+            border: none;
+        }
+
+        .slider::-moz-range-thumb {
+            width: 14px;
+            height: 14px;
+            background: #e8e8e8;
+            cursor: pointer;
+            border: none;
+            border-radius: 0;
+        }
+
+        .slider-display {
+            font-weight: bold;
+            min-width: 48px;
+            text-align: right;
+            color: rgba(232,232,232,0.6);
+            font-size: 0.82em;
+        }
+
+        .transport-row {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .transport-primary { display: flex; gap: 8px; }
+
+        .volume-inline {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+            min-width: 160px;
+        }
+
+        .record-group { display: flex; gap: 8px; margin-left: auto; }
+
+        .timeline-group {
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .params-stack { display: flex; flex-direction: column; gap: 12px; }
+
+        .param-row {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .param-label {
+            font-size: 0.68em;
+            min-width: 130px;
+            color: rgba(232,232,232,0.45);
+            letter-spacing: 0.5px;
+        }
+
+        .param-hint {
+            display: block;
+            font-size: 0.82em;
+            color: rgba(232,232,232,0.2);
+            margin-top: 1px;
+            letter-spacing: 0;
+        }
+
+        /* --- Video overlay --- */
+        .video-wrapper { position: relative; }
+
+        .video-overlay {
+            position: absolute;
+            top: 0; left: 0; bottom: 0;
+            width: 72px;
+            background: linear-gradient(to right, rgba(0,0,0,0.68), transparent);
+            padding: 14px 8px;
+            font-family: 'Courier Prime', monospace;
+            font-size: 0.65em;
+            pointer-events: none;
+            letter-spacing: 0.5px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .overlay-item {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+        }
+
+        .ov-label {
+            color: rgba(232,232,232,0.35);
+            font-size: 0.82em;
+            letter-spacing: 1px;
+        }
+
+        .overlay-item span:last-child {
+            color: #e8e8e8;
+        }
+
+        /* --- Inline video progress bar --- */
+        .video-progress-track {
+            width: 100%;
+            height: 3px;
+            background: rgba(255,255,255,0.07);
+        }
+
+        .video-progress-fill {
+            height: 100%;
+            background: rgba(232,232,232,0.55);
+            width: 0%;
+        }
+
+        /* --- Timeline --- */
+        .timeline-container {
+            flex: 1;
+            height: 2px;
+            background: rgba(255,255,255,0.1);
+            cursor: pointer;
+            position: relative;
+            min-width: 200px;
+        }
+
+        .timeline-progress {
+            height: 100%;
+            background: rgba(232,232,232,0.7);
+        }
+
+        .time-info {
+            font-size: 0.75em;
+            margin-top: 8px;
+            text-align: center;
+            color: rgba(232,232,232,0.35);
+        }
+
+        /* --- Status --- */
+        .status-line {
+            margin-top: 20px;
+            padding: 10px 12px;
+            background: rgba(255,255,255,0.02);
+            border-left: 2px solid rgba(255,255,255,0.12);
+            font-size: 0.82em;
+            color: rgba(232,232,232,0.6);
+        }
+
+        .status-prefix { color: rgba(232,232,232,0.3); margin-right: 6px; }
+
+        .recording-indicator {
+            display: inline-block;
+            width: 7px;
+            height: 7px;
+            background: #ef4444;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.75); }
+        }
+
+        .tool-info {
+            margin-top: 24px;
+            padding: 14px;
+            border: 1px solid rgba(255,255,255,0.05);
+            font-size: 0.78em;
+            line-height: 1.5;
+            color: rgba(232,232,232,0.25);
+        }
+
+        .tool-info h3 { color: rgba(232,232,232,0.35); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 2px; font-size: 0.9em; }
+
+        /* --- Capture window --- */
+        .capture-window {
+            margin-top: 20px;
+            border: 1px solid rgba(255,255,255,0.07);
+            background: #000;
+            display: none;
+        }
+
+        .capture-window-label {
+            padding: 6px 12px;
+            font-size: 0.65em;
+            letter-spacing: 2px;
+            color: rgba(232,232,232,0.25);
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            text-transform: uppercase;
+            background: #0c0c0c;
+        }
+
+        .capture-window-body {
+            position: relative;
+        }
+
+        .capture-canvas {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .capture-overlay-controls {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 260px;
+            padding: 14px;
+            background: rgba(0,0,0,0.6);
+            border-left: 1px solid rgba(255,255,255,0.07);
+        }
+
+        .capture-progress-track {
+            width: 100%;
+            height: 4px;
+            background: rgba(255,255,255,0.07);
+        }
+
+        .capture-progress-fill {
+            height: 100%;
+            background: rgba(232,232,232,0.5);
+            width: 0%;
+        }
+
+        .capture-fft-text {
+            font-size: 0.65em;
+            color: rgba(232,232,232,0.3);
+            letter-spacing: 0.5px;
+            margin-top: 12px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255,255,255,0.05);
+            line-height: 1.6;
+        }
+
+        @media (max-width: 768px) {
+            .terminal { flex-direction: column; }
+            .debug-panel { width: 100%; order: 2; position: static; }
+            .fft-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="terminal">
+        <div class="main-content">
+            <div class="header">
+                <div class="title">SPECTRAL.EXE<span class="cursor"></span></div>
+            </div>
+
+            <div class="upload-zone" id="uploadZone">
+                <div class="upload-text">>> DROP VIDEO FILE OR CLICK TO SELECT</div>
+                <button class="btn" onclick="event.stopPropagation(); document.getElementById('fileInput').click()">BROWSE FILES</button>
+                <input type="file" id="fileInput" class="file-input" accept="video/*" />
+            </div>
+
+            <div class="video-container" id="videoContainer">
+                <div class="video-wrapper">
+                    <video id="videoPlayer" playsinline preload="none"></video>
+                    <div class="video-overlay" id="videoOverlay">
+                        <div class="overlay-item"><span class="ov-label">BASS</span><span id="ovBass">0.00</span></div>
+                        <div class="overlay-item"><span class="ov-label">LO</span><span id="ovLowMid">0.00</span></div>
+                        <div class="overlay-item"><span class="ov-label">HI</span><span id="ovHighMid">0.00</span></div>
+                        <div class="overlay-item"><span class="ov-label">TRB</span><span id="ovTreble">0.00</span></div>
+                        <div class="overlay-item"><span class="ov-label">Δ</span><span id="ovSeekDelta">+0.000s</span></div>
+                        <div class="overlay-item"><span class="ov-label">T</span><span id="ovTime">0.00s</span></div>
+                    </div>
+                </div>
+                <div class="video-progress-track">
+                    <div class="video-progress-fill" id="videoProgressFill"></div>
+                </div>
+            </div>
+
+            <div class="visualizer" id="visualizer">
+                <div class="viz-label-row">FREQUENCY ANALYSIS</div>
+                <div class="viz-bars">
+                    <div class="viz-col">
+                        <div class="viz-bar-track"><div class="viz-bar bass" id="bassBar"></div></div>
+                        <div class="viz-tag">BASS</div>
+                    </div>
+                    <div class="viz-col">
+                        <div class="viz-bar-track"><div class="viz-bar lowmid" id="lowMidBar"></div></div>
+                        <div class="viz-tag">LO-MID</div>
+                    </div>
+                    <div class="viz-col">
+                        <div class="viz-bar-track"><div class="viz-bar highmid" id="highMidBar"></div></div>
+                        <div class="viz-tag">HI-MID</div>
+                    </div>
+                    <div class="viz-col">
+                        <div class="viz-bar-track"><div class="viz-bar treble" id="trebleBar"></div></div>
+                        <div class="viz-tag">TREBLE</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="controls" id="controls">
+
+                <div class="timeline-group">
+                    <div class="timeline-container" id="timelineContainer">
+                        <div class="timeline-progress" id="timelineProgress" style="width:0%"></div>
+                    </div>
+                    <div class="time-info" id="timeDisplay">00:00 / 00:00</div>
+                </div>
+
+                <div class="control-group">
+                    <div class="transport-row">
+                        <div class="transport-primary">
+                            <button class="btn" id="playBtn">PLAY</button>
+                            <button class="btn" id="resetBtn">RESET</button>
+                            <button class="btn" id="loopBtn">LOOP</button>
+                        </div>
+                        <div class="volume-inline">
+                            <button class="btn" id="muteBtn">MUTE</button>
+                            <div class="slider-container">
+                                <input type="range" class="slider" id="volumeSlider" min="0" max="100" value="70" />
+                            </div>
+                            <div class="slider-display" id="volumeDisplay">70%</div>
+                        </div>
+                        <div class="record-group">
+                            <button class="btn" id="recordBtn">REC</button>
+                            <button class="btn" id="downloadBtn" disabled>EXPORT</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <div class="control-label">SPECTRAL PARAMETERS</div>
+                    <div class="params-stack">
+                        <div class="param-row">
+                            <div class="param-label">BASS INFLUENCE<span class="param-hint">low freq → backward pull</span></div>
+                            <div class="slider-container"><input type="range" class="slider" id="bassSlider" min="0" max="200" value="80" /></div>
+                            <div class="slider-display" id="bassDisplay">0.80</div>
+                        </div>
+                        <div class="param-row">
+                            <div class="param-label">TREBLE INFLUENCE<span class="param-hint">high freq → forward scatter</span></div>
+                            <div class="slider-container"><input type="range" class="slider" id="trebleSlider" min="0" max="200" value="60" /></div>
+                            <div class="slider-display" id="trebleDisplay">0.60</div>
+                        </div>
+                        <div class="param-row">
+                            <div class="param-label">MAX SEEK RANGE<span class="param-hint">max displacement per frame</span></div>
+                            <div class="slider-container"><input type="range" class="slider" id="seekRangeSlider" min="0" max="100" value="30" /></div>
+                            <div class="slider-display" id="seekRangeDisplay">0.30s</div>
+                        </div>
+                        <div class="param-row">
+                            <div class="param-label">FFT SMOOTHING<span class="param-hint">response lag — higher = sluggish</span></div>
+                            <div class="slider-container"><input type="range" class="slider" id="smoothingSlider" min="0" max="95" value="80" /></div>
+                            <div class="slider-display" id="smoothingDisplay">0.80</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <div class="control-label">OVERLAY SETTINGS</div>
+                    <div class="params-stack">
+                        <div class="param-row">
+                            <div class="param-label">CANVAS TEXT<span class="param-hint">baked text on capture canvas</span></div>
+                            <div class="slider-container"><input type="range" class="slider" id="overlayTextScaleSlider" min="25" max="300" value="100" /></div>
+                            <div class="slider-display" id="overlayTextScaleDisplay">1.00×</div>
+                        </div>
+                        <div class="param-row">
+                            <div class="param-label">PANEL SCALE<span class="param-hint">overlay controls panel size</span></div>
+                            <div class="slider-container"><input type="range" class="slider" id="overlayPanelScaleSlider" min="50" max="200" value="100" /></div>
+                            <div class="slider-display" id="overlayPanelScaleDisplay">1.00×</div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="capture-window" id="captureWindow">
+                <div class="capture-window-label">CAPTURE VIEW — OBS TARGET</div>
+                <div class="capture-window-body">
+                    <canvas class="capture-canvas" id="captureCanvas"></canvas>
+                </div>
+                <div class="capture-progress-track">
+                    <div class="capture-progress-fill" id="captureProgressFill"></div>
+                </div>
+            </div>
+
+            <div class="status-line">
+                <span class="status-prefix">STATUS:</span>
+                <span id="statusText">WAITING FOR VIDEO INPUT...</span>
+            </div>
+
+            <div class="tool-info">
+                <h3>SPECTRAL.EXE v1.0</h3>
+                <p>AUDIO-REACTIVE TEMPORAL DISPLACEMENT ENGINE</p>
+            </div>
+        </div>
+
+        <div class="debug-panel" id="debugPanel">
+            <div class="debug-header">
+                <span>DEBUG LOG</span>
+                <button class="debug-toggle" id="debugToggle">−</button>
+            </div>
+            <div class="debug-log" id="debugLog"></div>
+            <div class="debug-stats" id="debugStats">
+                <div class="debug-stat"><span>FPS:</span><span id="fpsCounter">0</span></div>
+                <div class="debug-stat"><span>Frame Time:</span><span id="frameTime">0ms</span></div>
+                <div class="debug-stat"><span>Video Ready:</span><span id="videoReady">NO</span></div>
+                <div class="debug-stat"><span>Seek Delta:</span><span id="seekDeltaDisplay">—</span></div>
+                <div class="debug-stat"><span>Current Time:</span><span id="currentTimeDisplay">—</span></div>
+                <div class="debug-stat"><span>Has Audio:</span><span id="hasAudioDisplay">—</span></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // --- State ---
+    const video = document.getElementById('videoPlayer');
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const captureCanvas = document.getElementById('captureCanvas');
+    const captureCtx = captureCanvas.getContext('2d');
+
+    let audioContext, audioSource, gainNode, analyser, frequencyData;
+    let mediaRecorder, recordedChunks = [];
+    let isPlaying = false;
+    let isRecording = false;
+    let isMuted = false;
+    let hasAudioTrack = true;
+    let animationId;
+    let currentFrameTime = 0;
+    let duration = 0;
+    let frameRate = 30;
+    let volume = 0.7;
+
+    // FFT params (match slider defaults)
+    let bassInfluence   = 0.8;
+    let trebleInfluence = 0.6;
+    let maxSeekRange    = 0.3;
+    let smoothingValue  = 0.8;
+
+    // Overlay display settings
+    let overlayTextScale  = 1.0;
+    let overlayPanelScale = 1.0;
+
+    // Mouse tracking for canvas cursor
+    let mouseX = -1, mouseY = -1;
+
+    // Last frame values — allows redraw when sliders change while paused
+    let lastFrameValues = null;
+
+    // Canvas panel drag state
+    let draggingParam = -1; // -1 = none, 0-3 = param index
+
+    let isLooping = false;
+    let lastLoopTime = 0;
+
+    // Debug
+    let frameCount = 0;
+    let silenceCheckDone = false;
+    let lastFrameTime = 0;
+    let fpsHistory = [];
+    let debugLines = [];
+    const MAX_DEBUG_LINES = 12;
+
+    // DOM refs
+    const els = {
+        uploadZone:       document.getElementById('uploadZone'),
+        fileInput:        document.getElementById('fileInput'),
+        videoContainer:   document.getElementById('videoContainer'),
+        visualizer:       document.getElementById('visualizer'),
+        controls:         document.getElementById('controls'),
+        playBtn:          document.getElementById('playBtn'),
+        resetBtn:         document.getElementById('resetBtn'),
+        muteBtn:          document.getElementById('muteBtn'),
+        volumeSlider:     document.getElementById('volumeSlider'),
+        volumeDisplay:    document.getElementById('volumeDisplay'),
+        bassSlider:       document.getElementById('bassSlider'),
+        bassDisplay:      document.getElementById('bassDisplay'),
+        trebleSlider:     document.getElementById('trebleSlider'),
+        trebleDisplay:    document.getElementById('trebleDisplay'),
+        seekRangeSlider:  document.getElementById('seekRangeSlider'),
+        seekRangeDisplay: document.getElementById('seekRangeDisplay'),
+        smoothingSlider:  document.getElementById('smoothingSlider'),
+        smoothingDisplay: document.getElementById('smoothingDisplay'),
+        timelineContainer:document.getElementById('timelineContainer'),
+        timelineProgress: document.getElementById('timelineProgress'),
+        timeDisplay:      document.getElementById('timeDisplay'),
+        recordBtn:        document.getElementById('recordBtn'),
+        downloadBtn:      document.getElementById('downloadBtn'),
+        statusText:       document.getElementById('statusText'),
+        debugPanel:       document.getElementById('debugPanel'),
+        debugToggle:      document.getElementById('debugToggle'),
+        debugLog:         document.getElementById('debugLog'),
+        fpsCounter:       document.getElementById('fpsCounter'),
+        frameTime:        document.getElementById('frameTime'),
+        videoReady:       document.getElementById('videoReady'),
+        seekDeltaDisplay: document.getElementById('seekDeltaDisplay'),
+        currentTimeDisplay:document.getElementById('currentTimeDisplay'),
+        hasAudioDisplay:  document.getElementById('hasAudioDisplay'),
+        loopBtn:          document.getElementById('loopBtn'),
+        captureWindow:            document.getElementById('captureWindow'),
+        captureProgressFill:      document.getElementById('captureProgressFill'),
+        overlayTextScaleSlider:   document.getElementById('overlayTextScaleSlider'),
+        overlayTextScaleDisplay:  document.getElementById('overlayTextScaleDisplay'),
+        overlayPanelScaleSlider:  document.getElementById('overlayPanelScaleSlider'),
+        overlayPanelScaleDisplay: document.getElementById('overlayPanelScaleDisplay'),
+        bassBar:          document.getElementById('bassBar'),
+        lowMidBar:        document.getElementById('lowMidBar'),
+        highMidBar:       document.getElementById('highMidBar'),
+        trebleBar:        document.getElementById('trebleBar'),
+    };
+
+    // --- Debug ---
+    function debugLog(msg, type = 'info') {
+        const ts = new Date().toLocaleTimeString().slice(-8);
+        debugLines.unshift({ text: `${ts} ${msg}`, type });
+        if (debugLines.length > MAX_DEBUG_LINES) debugLines.length = MAX_DEBUG_LINES;
+        renderDebugLog();
+    }
+
+    function renderDebugLog() {
+        els.debugLog.innerHTML = '';
+        debugLines.forEach((line, i) => {
+            const div = document.createElement('div');
+            div.className = `debug-line ${line.type}${i > 6 ? ' fading' : ''}`;
+            div.textContent = line.text;
+            els.debugLog.appendChild(div);
+        });
+    }
+
+    // --- File handling ---
+    function initFileHandlers() {
+        els.uploadZone.addEventListener('dragover', e => {
+            e.preventDefault();
+            els.uploadZone.classList.add('dragover');
+        });
+        els.uploadZone.addEventListener('dragleave', e => {
+            e.preventDefault();
+            els.uploadZone.classList.remove('dragover');
+        });
+        els.uploadZone.addEventListener('drop', e => {
+            e.preventDefault();
+            els.uploadZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
+        });
+        els.uploadZone.addEventListener('click', () => els.fileInput.click());
+        els.fileInput.addEventListener('change', e => {
+            if (e.target.files.length > 0) handleFile(e.target.files[0]);
+        });
+    }
+
+    function handleFile(file) {
+        if (!file.type.startsWith('video/')) {
+            debugLog('Invalid file type', 'error');
+            els.statusText.textContent = 'ERROR: VIDEO FILE REQUIRED';
+            return;
+        }
+
+        // Stop playback and reset per-file state
+        if (isPlaying) pause();
+        currentFrameTime = 0;
+        frameCount = 0;
+        silenceCheckDone = false;
+        hasAudioTrack = true;
+        lastLoopTime = 0;
+        els.hasAudioDisplay.textContent = '—';
+
+        // Close old audio context so createMediaElementSource can be called again
+        if (audioContext) {
+            audioContext.close().catch(() => {});
+            audioContext = null;
+            audioSource = null;
+            gainNode = null;
+            analyser = null;
+            frequencyData = null;
+        }
+
+        debugLog(`Loading: ${file.name} (${(file.size/1024/1024).toFixed(1)}MB)`);
+        els.statusText.textContent = 'LOADING VIDEO DATA...';
+        if (video.src) URL.revokeObjectURL(video.src);
+        video.src = URL.createObjectURL(file);
+        video.load();
+    }
+
+    // --- Video + Audio setup ---
+    function initVideoHandlers() {
+        video.addEventListener('loadedmetadata', onVideoLoaded);
+        video.addEventListener('error', () => {
+            debugLog('Video load error', 'error');
+            els.statusText.textContent = 'ERROR: VIDEO LOAD FAILED';
+        });
+        video.addEventListener('canplay', () => debugLog('Video can play', 'info'));
+    }
+
+    function onVideoLoaded() {
+        duration = video.duration;
+        frameRate = 30;
+        canvas.width  = video.videoWidth  || 640;
+        canvas.height = video.videoHeight || 480;
+        captureCanvas.width  = video.videoWidth  || 640;
+        captureCanvas.height = video.videoHeight || 480;
+        video.volume = volume;
+
+        debugLog(`Video: ${video.videoWidth}x${video.videoHeight}, ${duration.toFixed(1)}s`);
+
+        setupAudio();
+
+        if (audioContext && audioContext.state === 'suspended') {
+            els.statusText.textContent = '[CLICK TO ENABLE AUDIO] — PRESS PLAY TO ACTIVATE';
+            debugLog('AudioContext suspended — awaiting user gesture', 'warning');
+        } else {
+            els.statusText.textContent = 'VIDEO LOADED — READY';
+        }
+
+        els.videoContainer.style.display = 'block';
+        els.visualizer.style.display = 'block';
+        els.controls.style.display = 'block';
+        els.captureWindow.style.display = 'block';
+        updateTimeDisplay();
+    }
+
+    function setupAudio() {
+        try {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioContext.createAnalyser();
+            analyser.fftSize = 2048;
+            analyser.smoothingTimeConstant = 0.8;
+            frequencyData = new Uint8Array(analyser.frequencyBinCount);
+
+            audioSource = audioContext.createMediaElementSource(video);
+            gainNode = audioContext.createGain();
+            gainNode.gain.value = volume;
+
+            audioSource.connect(analyser);
+            analyser.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            // audio track detection deferred to spectralLoop (audioTracks API unsupported in Chrome)
+
+            els.hasAudioDisplay.textContent = hasAudioTrack ? 'YES' : 'NO';
+            debugLog('Audio context ready', 'info');
+        } catch (err) {
+            debugLog('Audio setup failed: ' + err.message, 'error');
+        }
+    }
+
+    function updateTimeDisplay() {
+        const fmt = s => {
+            const m = Math.floor(s / 60);
+            const sec = Math.floor(s % 60);
+            return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+        };
+        els.timeDisplay.textContent = `${fmt(currentFrameTime)} / ${fmt(duration)}`;
+    }
+
+    // --- FFT helpers ---
+    function getBandEnergy(data, start, end) {
+        let sum = 0;
+        for (let i = start; i <= end; i++) sum += data[i];
+        return sum / ((end - start + 1) * 255);
+    }
+
+    // --- Core loop ---
+    function spectralLoop(timestamp) {
+        if (!isPlaying) return;
+
+        frameCount++;
+
+        const deltaTime = lastLoopTime > 0 ? Math.min((timestamp - lastLoopTime) / 1000, 0.1) : 1 / 60;
+        lastLoopTime = timestamp;
+        let seekDelta = deltaTime;
+
+        if (hasAudioTrack && analyser && frequencyData) {
+            analyser.getByteFrequencyData(frequencyData);
+
+            if (!silenceCheckDone && frameCount === 60) {
+                silenceCheckDone = true;
+                const maxVal = Math.max(...frequencyData);
+                if (maxVal === 0) {
+                    hasAudioTrack = false;
+                    els.hasAudioDisplay.textContent = 'NO';
+                    els.statusText.textContent = '[NO AUDIO TRACK] — NORMAL PLAYBACK';
+                    debugLog('No audio detected after 60 frames', 'warning');
+                }
+            }
+
+            const bass    = getBandEnergy(frequencyData, 0,   10);
+            const lowMid  = getBandEnergy(frequencyData, 11,  40);
+            const highMid = getBandEnergy(frequencyData, 41,  100);
+            const treble  = getBandEnergy(frequencyData, 101, 200);
+
+            seekDelta -= bass    * bassInfluence   * maxSeekRange;
+            seekDelta -= lowMid  * bassInfluence   * maxSeekRange * 0.4;
+            seekDelta += highMid * trebleInfluence * maxSeekRange * 0.4;
+            seekDelta += treble  * trebleInfluence * maxSeekRange;
+
+            updateVisualizer(bass, lowMid, highMid, treble);
+            updateVideoOverlay(bass, lowMid, highMid, treble, seekDelta);
+            drawCaptureFrame(bass, lowMid, highMid, treble, seekDelta);
+
+            if (frameCount % 30 === 0) {
+                els.seekDeltaDisplay.textContent   = seekDelta.toFixed(4) + 's';
+                els.currentTimeDisplay.textContent = currentFrameTime.toFixed(2) + 's';
+                updatePerfStats();
+            }
+        }
+
+        if (!hasAudioTrack) {
+            drawCaptureFrame(0, 0, 0, 0, seekDelta);
+        }
+        updateCaptureProgress();
+
+        currentFrameTime = Math.max(0, Math.min(currentFrameTime + seekDelta, duration));
+
+        if (currentFrameTime >= duration) {
+            if (isLooping) {
+                currentFrameTime = 0;
+                lastLoopTime = 0;
+            } else {
+                currentFrameTime = duration;
+                pause();
+                els.statusText.textContent = 'SEQUENCE COMPLETE';
+                return;
+            }
+        }
+
+        if (Math.abs(video.currentTime - currentFrameTime) > 0.05) {
+            video.currentTime = currentFrameTime;
+        }
+
+        if (video.readyState >= 2) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        }
+
+        updateTimeline();
+        updateTimeDisplay();
+
+        animationId = requestAnimationFrame(spectralLoop);
+    }
+
+    function updateVisualizer(bass, lowMid, highMid, treble) {
+        const maxH = 80;
+        els.bassBar.style.height    = (bass    * maxH) + 'px';
+        els.lowMidBar.style.height  = (lowMid  * maxH) + 'px';
+        els.highMidBar.style.height = (highMid * maxH) + 'px';
+        els.trebleBar.style.height  = (treble  * maxH) + 'px';
+    }
+
+    function updateVideoOverlay(bass, lowMid, highMid, treble, seekDelta) {
+        document.getElementById('ovBass').textContent      = bass.toFixed(2);
+        document.getElementById('ovLowMid').textContent    = lowMid.toFixed(2);
+        document.getElementById('ovHighMid').textContent   = highMid.toFixed(2);
+        document.getElementById('ovTreble').textContent    = treble.toFixed(2);
+        document.getElementById('ovSeekDelta').textContent = (seekDelta >= 0 ? '+' : '') + seekDelta.toFixed(3) + 's';
+        document.getElementById('ovTime').textContent      = currentFrameTime.toFixed(2) + 's';
+    }
+
+    function getPanelGeometry() {
+        const w = captureCanvas.width;
+        const h = captureCanvas.height;
+        const pfs    = Math.max(9, Math.round(w * 0.018 * overlayPanelScale));
+        const pad    = Math.round(pfs * 0.9);
+        const labelW = pfs * 5.5;
+        const valW   = pfs * 3.8;
+        const barH   = Math.max(2, Math.round(pfs * 0.25));
+        const rowH   = pfs * 2.4;
+        const panelW = pad * 2 + labelW + pfs * 5 + valW;
+        const panelH = pad * 2 + rowH * 4;
+        const px     = w - panelW;
+        const barAreaW   = panelW - pad * 2 - labelW - valW - pad;
+        const barX       = px + pad + labelW;
+        const panelStartY = (h - panelH) / 2;
+        return { pfs, pad, labelW, valW, barH, rowH, panelW, panelH, px, barAreaW, barX, panelStartY, w, h };
+    }
+
+    function getCanvasCoords(clientX, clientY) {
+        const rect = captureCanvas.getBoundingClientRect();
+        if (!rect.width) return { x: -1, y: -1 };
+        return {
+            x: (clientX - rect.left) * (captureCanvas.width  / rect.width),
+            y: (clientY - rect.top)  * (captureCanvas.height / rect.height),
+        };
+    }
+
+    function hitTestPanel(cx, cy) {
+        const g = getPanelGeometry();
+        if (cx < g.px - g.pfs * 2) return -1;
+        for (let i = 0; i < 4; i++) {
+            const top = g.panelStartY + g.pad + i * g.rowH;
+            if (cy >= top && cy <= top + g.rowH) return i;
+        }
+        return -1;
+    }
+
+    function applyParamDrag(paramIndex, cx) {
+        const g = getPanelGeometry();
+        const norm = Math.min(1, Math.max(0, (cx - g.barX) / g.barAreaW));
+        switch (paramIndex) {
+            case 0:
+                bassInfluence = norm * 2;
+                els.bassDisplay.textContent = bassInfluence.toFixed(2);
+                els.bassSlider.value = Math.round(norm * 200);
+                break;
+            case 1:
+                trebleInfluence = norm * 2;
+                els.trebleDisplay.textContent = trebleInfluence.toFixed(2);
+                els.trebleSlider.value = Math.round(norm * 200);
+                break;
+            case 2:
+                maxSeekRange = norm;
+                els.seekRangeDisplay.textContent = maxSeekRange.toFixed(2) + 's';
+                els.seekRangeSlider.value = Math.round(norm * 100);
+                break;
+            case 3:
+                smoothingValue = norm * 0.95;
+                if (analyser) analyser.smoothingTimeConstant = smoothingValue;
+                els.smoothingDisplay.textContent = smoothingValue.toFixed(2);
+                els.smoothingSlider.value = Math.round(norm * 95);
+                break;
+        }
+        if (lastFrameValues) drawCaptureFrame(...Object.values(lastFrameValues));
+    }
+
+    function drawCaptureFrame(bass, lowMid, highMid, treble, seekDelta) {
+        if (video.readyState < 2) return;
+        lastFrameValues = { bass, lowMid, highMid, treble, seekDelta };
+
+        const w = captureCanvas.width;
+        const h = captureCanvas.height;
+
+        // --- Video frame ---
+        captureCtx.drawImage(video, 0, 0, w, h);
+
+        // --- Left-side scrim + text ---
+        const fs = Math.max(8, Math.round(w * 0.018 * overlayTextScale));
+        const scrimW = Math.round(fs * 6);
+        const leftScrim = captureCtx.createLinearGradient(0, 0, scrimW, 0);
+        leftScrim.addColorStop(0, 'rgba(0,0,0,0.72)');
+        leftScrim.addColorStop(1, 'rgba(0,0,0,0)');
+        captureCtx.fillStyle = leftScrim;
+        captureCtx.fillRect(0, 0, scrimW, h);
+
+        const lineH = fs * 1.7;
+        const lx = Math.round(w * 0.012);
+        captureCtx.font = `${fs}px "Courier Prime", monospace`;
+        captureCtx.textAlign = 'left';
+
+        const items = [
+            ['BASS', bass.toFixed(2)],
+            ['LO',   lowMid.toFixed(2)],
+            ['HI',   highMid.toFixed(2)],
+            ['TRB',  treble.toFixed(2)],
+            ['',     ''],
+            ['Δ',    (seekDelta >= 0 ? '+' : '') + seekDelta.toFixed(3) + 's'],
+            ['T',    currentFrameTime.toFixed(1) + 's'],
+        ];
+
+        const blockH = items.length * lineH;
+        const startY = (h - blockH) / 2 + fs;
+        items.forEach(([label, val], i) => {
+            if (!label) return;
+            const y = startY + i * lineH;
+            captureCtx.fillStyle = 'rgba(232,232,232,0.38)';
+            captureCtx.fillText(label, lx, y);
+            captureCtx.fillStyle = 'rgba(232,232,232,0.92)';
+            captureCtx.fillText(val, lx + fs * 2.8, y);
+        });
+
+        // --- Right-side panel overlay ---
+        const g = getPanelGeometry();
+
+        const rightScrim = captureCtx.createLinearGradient(g.px - g.pfs * 2, 0, w, 0);
+        rightScrim.addColorStop(0, 'rgba(0,0,0,0)');
+        rightScrim.addColorStop(1, 'rgba(0,0,0,0.72)');
+        captureCtx.fillStyle = rightScrim;
+        captureCtx.fillRect(g.px - g.pfs * 2, 0, g.panelW + g.pfs * 2, h);
+
+        captureCtx.font = `${g.pfs}px "Courier Prime", monospace`;
+
+        const paramRows = [
+            ['BASS',   bassInfluence / 2,    bassInfluence.toFixed(2)],
+            ['TREBLE', trebleInfluence / 2,  trebleInfluence.toFixed(2)],
+            ['SEEK',   maxSeekRange,          maxSeekRange.toFixed(2) + 's'],
+            ['SMOOTH', smoothingValue / 0.95, smoothingValue.toFixed(2)],
+        ];
+
+        paramRows.forEach(([name, norm, dispVal], i) => {
+            const cy = g.panelStartY + g.pad + i * g.rowH + g.rowH / 2;
+            const isActive = draggingParam === i;
+
+            captureCtx.fillStyle = isActive ? 'rgba(232,232,232,0.75)' : 'rgba(232,232,232,0.32)';
+            captureCtx.textAlign = 'left';
+            captureCtx.fillText(name, g.px + g.pad, cy + g.pfs * 0.35);
+
+            captureCtx.fillStyle = 'rgba(255,255,255,0.1)';
+            captureCtx.fillRect(g.barX, cy - g.barH / 2, g.barAreaW, g.barH);
+            captureCtx.fillStyle = isActive ? 'rgba(232,232,232,0.95)' : 'rgba(232,232,232,0.7)';
+            captureCtx.fillRect(g.barX, cy - g.barH / 2, g.barAreaW * Math.min(1, Math.max(0, norm)), g.barH);
+
+            captureCtx.fillStyle = isActive ? 'rgba(232,232,232,0.95)' : 'rgba(232,232,232,0.6)';
+            captureCtx.textAlign = 'right';
+            captureCtx.fillText(dispVal, w - g.pad, cy + g.pfs * 0.35);
+        });
+
+        // --- Mouse cursor ---
+        const rect = captureCanvas.getBoundingClientRect();
+        if (mouseX >= 0 && rect.width > 0) {
+            const cx = (mouseX - rect.left) * (w / rect.width);
+            const cy = (mouseY - rect.top) * (h / rect.height);
+            const r = 9;
+            captureCtx.save();
+            captureCtx.strokeStyle = 'rgba(232,232,232,0.82)';
+            captureCtx.lineWidth = 1.5;
+            captureCtx.beginPath();
+            captureCtx.arc(cx, cy, r, 0, Math.PI * 2);
+            captureCtx.stroke();
+            captureCtx.beginPath();
+            captureCtx.moveTo(cx - r * 1.6, cy);
+            captureCtx.lineTo(cx + r * 1.6, cy);
+            captureCtx.moveTo(cx, cy - r * 1.6);
+            captureCtx.lineTo(cx, cy + r * 1.6);
+            captureCtx.stroke();
+            captureCtx.restore();
+        }
+    }
+
+    function updateCaptureProgress() {
+        const pct = duration > 0 ? (currentFrameTime / duration) * 100 : 0;
+        els.captureProgressFill.style.width = pct + '%';
+    }
+
+    function updatePerfStats() {
+        const now = performance.now();
+        const dt = now - lastFrameTime;
+        lastFrameTime = now;
+        fpsHistory.push(1000 / dt);
+        if (fpsHistory.length > 10) fpsHistory.shift();
+        const avgFps = fpsHistory.reduce((a, b) => a + b, 0) / fpsHistory.length;
+        els.fpsCounter.textContent = Math.round(avgFps);
+        els.frameTime.textContent  = Math.round(dt) + 'ms';
+        els.videoReady.textContent = video.readyState >= 2 ? 'YES' : 'NO';
+    }
+
+    // --- Playback control ---
+    function play() {
+        if (!audioContext) return;
+        if (audioContext.state === 'suspended') {
+            audioContext.resume();
+        }
+        isPlaying = true;
+        lastLoopTime = 0;
+        els.playBtn.textContent = 'PAUSE';
+        els.statusText.textContent = 'SPECTRAL PROCESSING ACTIVE...';
+        video.play().catch(err => debugLog('Play failed: ' + err.message, 'error'));
+        requestAnimationFrame(spectralLoop);
+    }
+
+    function pause() {
+        isPlaying = false;
+        els.playBtn.textContent = 'PLAY';
+        els.statusText.textContent = 'PAUSED';
+        video.pause();
+        cancelAnimationFrame(animationId);
+    }
+
+    function resetVideo() {
+        pause();
+        currentFrameTime = 0;
+        video.currentTime = 0;
+        updateTimeline();
+        updateTimeDisplay();
+        els.bassBar.style.height    = '0px';
+        els.lowMidBar.style.height  = '0px';
+        els.highMidBar.style.height = '0px';
+        els.trebleBar.style.height  = '0px';
+        els.statusText.textContent  = 'RESET TO START POSITION';
+        debugLog('Reset', 'info');
+    }
+
+    function toggleMute() {
+        isMuted = !isMuted;
+        video.muted = isMuted;
+        if (gainNode) gainNode.gain.value = isMuted ? 0 : volume;
+        els.muteBtn.textContent = isMuted ? 'UNMUTE' : 'MUTE';
+    }
+
+    function updateTimeline() {
+        const pct = duration > 0 ? (currentFrameTime / duration) * 100 : 0;
+        els.timelineProgress.style.width = pct + '%';
+        document.getElementById('videoProgressFill').style.width = pct + '%';
+    }
+
+    // --- Recording ---
+    function toggleRecording() {
+        isRecording ? stopRecording() : startRecording();
+    }
+
+    function startRecording() {
+        recordedChunks = [];
+        try {
+            const videoStream = canvas.captureStream(frameRate);
+            let stream = videoStream;
+
+            if (audioContext) {
+                try {
+                    const audioDest = audioContext.createMediaStreamDestination();
+                    gainNode.connect(audioDest);
+                    stream = new MediaStream([
+                        ...videoStream.getVideoTracks(),
+                        ...audioDest.stream.getAudioTracks()
+                    ]);
+                } catch (e) {
+                    debugLog('Audio capture failed, video only', 'warning');
+                }
+            }
+
+            const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
+                ? 'video/webm;codecs=vp9,opus'
+                : 'video/webm';
+
+            mediaRecorder = new MediaRecorder(stream, { mimeType });
+            mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                const url  = URL.createObjectURL(blob);
+                els.downloadBtn.disabled = false;
+                els.downloadBtn.onclick = () => {
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'spectral-output.webm';
+                    a.click();
+                };
+                debugLog('Recording saved', 'info');
+                els.statusText.textContent = 'RECORDING SAVED — READY FOR EXPORT';
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            els.recordBtn.innerHTML = '<span class="recording-indicator"></span>STOP';
+            els.statusText.textContent = 'RECORDING...';
+            debugLog('Recording started', 'info');
+        } catch (err) {
+            debugLog('Recording failed: ' + err.message, 'error');
+            els.statusText.textContent = 'ERROR: RECORDING NOT SUPPORTED';
+        }
+    }
+
+    function stopRecording() {
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+        isRecording = false;
+        els.recordBtn.textContent = 'REC';
+        debugLog('Recording stopped', 'info');
+    }
+
+    // --- Controls init ---
+    function initControls() {
+        els.debugToggle.addEventListener('click', () => {
+            els.debugPanel.classList.toggle('collapsed');
+            els.debugToggle.textContent = els.debugPanel.classList.contains('collapsed') ? '+' : '−';
+        });
+
+        els.playBtn.addEventListener('click', () => isPlaying ? pause() : play());
+        els.resetBtn.addEventListener('click', resetVideo);
+        els.loopBtn.addEventListener('click', () => {
+            isLooping = !isLooping;
+            els.loopBtn.classList.toggle('active', isLooping);
+        });
+        els.muteBtn.addEventListener('click', toggleMute);
+        els.recordBtn.addEventListener('click', toggleRecording);
+
+        els.volumeSlider.addEventListener('input', e => {
+            volume = e.target.value / 100;
+            if (!isMuted && gainNode) gainNode.gain.value = volume;
+            els.volumeDisplay.textContent = e.target.value + '%';
+        });
+
+        els.timelineContainer.addEventListener('click', e => {
+            const rect = els.timelineContainer.getBoundingClientRect();
+            currentFrameTime = ((e.clientX - rect.left) / rect.width) * duration;
+            video.currentTime = currentFrameTime;
+            updateTimeline();
+            updateTimeDisplay();
+        });
+
+        els.bassSlider.addEventListener('input', e => {
+            bassInfluence = e.target.value / 100;
+            els.bassDisplay.textContent = bassInfluence.toFixed(2);
+            if (lastFrameValues) drawCaptureFrame(...Object.values(lastFrameValues));
+        });
+
+        els.trebleSlider.addEventListener('input', e => {
+            trebleInfluence = e.target.value / 100;
+            els.trebleDisplay.textContent = trebleInfluence.toFixed(2);
+            if (lastFrameValues) drawCaptureFrame(...Object.values(lastFrameValues));
+        });
+
+        els.seekRangeSlider.addEventListener('input', e => {
+            maxSeekRange = e.target.value / 100;
+            els.seekRangeDisplay.textContent = maxSeekRange.toFixed(2) + 's';
+            if (lastFrameValues) drawCaptureFrame(...Object.values(lastFrameValues));
+        });
+
+        els.smoothingSlider.addEventListener('input', e => {
+            smoothingValue = e.target.value / 100;
+            if (analyser) analyser.smoothingTimeConstant = smoothingValue;
+            els.smoothingDisplay.textContent = smoothingValue.toFixed(2);
+            if (lastFrameValues) drawCaptureFrame(...Object.values(lastFrameValues));
+        });
+
+        els.overlayTextScaleSlider.addEventListener('input', e => {
+            overlayTextScale = e.target.value / 100;
+            els.overlayTextScaleDisplay.textContent = overlayTextScale.toFixed(2) + '×';
+            if (lastFrameValues) drawCaptureFrame(...Object.values(lastFrameValues));
+        });
+
+        els.overlayPanelScaleSlider.addEventListener('input', e => {
+            overlayPanelScale = e.target.value / 100;
+            els.overlayPanelScaleDisplay.textContent = overlayPanelScale.toFixed(2) + '×';
+            if (lastFrameValues) drawCaptureFrame(...Object.values(lastFrameValues));
+        });
+    }
+
+    // --- Boot ---
+    function initApp() {
+        debugLog('SPECTRAL.EXE v1.0 initializing...', 'info');
+        initFileHandlers();
+        initVideoHandlers();
+        initControls();
+        captureCanvas.addEventListener('mousedown', e => {
+            const { x, y } = getCanvasCoords(e.clientX, e.clientY);
+            const hit = hitTestPanel(x, y);
+            if (hit >= 0) {
+                draggingParam = hit;
+                applyParamDrag(hit, x);
+                e.preventDefault();
+            }
+        });
+
+        document.addEventListener('mousemove', e => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+            if (draggingParam >= 0) {
+                const { x } = getCanvasCoords(e.clientX, e.clientY);
+                applyParamDrag(draggingParam, x);
+            }
+            // Update cursor style on canvas
+            if (captureCanvas.width > 0) {
+                const { x, y } = getCanvasCoords(e.clientX, e.clientY);
+                captureCanvas.style.cursor = hitTestPanel(x, y) >= 0 ? 'ew-resize' : 'default';
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            draggingParam = -1;
+        });
+        debugLog('Application ready', 'info');
+    }
+
+    document.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>
